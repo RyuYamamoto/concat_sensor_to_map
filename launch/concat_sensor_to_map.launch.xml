@@ -1,0 +1,9 @@
+<launch>
+  <arg name="save_path" default=""/>
+  <arg name="pcd_path" default=""/>
+  <node pkg="concat_sensor_to_map" exec="concat_sensor_to_map_node" name="concat_sensor_to_map_node" output="screen">
+    <param name="pcd_path" value="$(var pcd_path)"/>
+    <!--remap from="~/input/points_raw" to="/sensing/lidar/concatenated/pointcloud"/-->
+    <remap from="~/input/points_raw" to="/sensing/lidar/right_upper/outlier_filtered/pointcloud"/>
+  </node>
+</launch>
