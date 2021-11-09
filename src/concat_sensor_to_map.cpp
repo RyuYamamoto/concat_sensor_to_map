@@ -22,6 +22,7 @@ public:
 
     leaf_size_ = this->declare_parameter("leaf_size", 0.2);
     min_displacement_ = this->declare_parameter("min_displacement", 5.0);
+    min_distance_threshold_ = this->declare_parameter("min_distance_threshold", 0.3);
     base_frame_id_ = this->declare_parameter("base_frame_id", "base_link");
     map_frame_id_ = this->declare_parameter("map_frame_id", "map");
     save_path_ = this->declare_parameter("save_path", "");
@@ -99,7 +100,7 @@ private:
       std::vector<int> nn_indices(1);
       std::vector<float> nn_dists(1);
       tree_->nearestKSearch(voxel_grid_cloud->points.at(i), 1, nn_indices, nn_dists);
-      if(0.3 < std::sqrt(nn_dists.at(0))) {
+      if(min_distance_threshold_ < std::sqrt(nn_dists.at(0))) {
         filtered_cloud->points.push_back(voxel_grid_cloud->points.at(i));
       }
     }
@@ -120,6 +121,7 @@ private:
 
   double leaf_size_;
   double min_displacement_;
+  double min_distance_threshold_;
 
   int file_num_{0};
 
