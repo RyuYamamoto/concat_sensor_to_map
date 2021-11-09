@@ -1,9 +1,13 @@
 <launch>
-  <arg name="save_path" default="/home/haze/Desktop"/>
+  <arg name="save_path" default=""/>
   <arg name="pcd_path" default=""/>
+  <arg name="min_displacement" default="5.0"/>
+  <arg name="min_distance_threshold" default="0.3"/>
   <node pkg="concat_sensor_to_map" exec="concat_sensor_to_map_node" name="concat_sensor_to_map_node" output="screen">
     <param name="pcd_path" value="$(var pcd_path)"/>
     <param name="save_path" value="$(var save_path)"/>
+    <param name="min_displacement" value="$(var min_displacement)"/>
+    <param name="min_distance_threshold" value="$(var min_distance_threshold)"/>
     <!--remap from="~/input/points_raw" to="/sensing/lidar/concatenated/pointcloud"/-->
     <remap from="~/input/points_raw" to="/sensing/lidar/right_upper/outlier_filtered/pointcloud"/>
   </node>
