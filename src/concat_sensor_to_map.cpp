@@ -7,6 +7,7 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl/registration/ndt.h>
+#include <pcl/search/pcl_search.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl_ros/transforms.hpp>
 
@@ -32,6 +33,11 @@ public:
 
     map_cloud_.reset(new pcl::PointCloud<pcl::PointXYZ>);
     if (pcl::io::loadPCDFile<pcl::PointXYZ>(pcd_path_+"/pointcloud_map.pcd", *map_cloud_) == -1) exit(-1);
+
+    if(!tree_) {
+      tree_.reset(new pcl::search::KdTree<pcl::PointXYZ>(true));
+    }
+    tree_->setInputCloud(map_cloud_);
   }
   ~ConcatSensorToMap() = default;
 
@@ -81,18 +87,29 @@ private:
   }
   void saveMap(const pcl::PointCloud<pcl::PointXYZ>::Ptr map_cloud, double leaf_size)
   {
+    pcl::PointCloud<pcl::PointXYZ>::Ptr voxel_grid_cloud(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud(new pcl::PointCloud<pcl::PointXYZ>);
 
     pcl::VoxelGrid<pcl::PointXYZ> voxel_grid_filter;
     voxel_grid_filter.setLeafSize(leaf_size, leaf_size, leaf_size);
     voxel_grid_filter.setInputCloud(map_cloud);
-    voxel_grid_filter.filter(*filtered_cloud);
+    voxel_grid_filter.filter(*voxel_grid_cloud);
+
+    for(std::size_t i=0;i<voxel_grid_cloud->size();++i) {
+      std::vector<int> nn_indices(1);
+      std::vector<float> nn_dists(1);
+      tree_->nearestKSearch(voxel_grid_cloud->points.at(i), 1, nn_indices, nn_dists);
+      if(0.3 < std::sqrt(nn_dists.at(0))) {
+        filtered_cloud->points.push_back(voxel_grid_cloud->points.at(i));
+      }
+    }
 
     *map_cloud_ += *filtered_cloud;
+    tree_->setInputCloud(map_cloud_);
 
     pcl::io::savePCDFileBinary(save_path_ + "/map_concat.pcd", *map_cloud_);
     pcl::io::savePCDFileBinary(
-      save_path_ + "/map_" + std::to_string(file_num_++) + ".pcd", *filtered_cloud);
+      save_path_ + "/map_" + std::to_string(file_num_++) + ".pcd", *voxel_grid_cloud);
   }
 
 private:
@@ -107,6 +124,7 @@ private:
   int file_num_{0};
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr map_cloud_;
+  pcl::search::Search<pcl::PointXYZ>::Ptr tree_;
 
   geometry_msgs::msg::TransformStamped prev_transform_;
 
