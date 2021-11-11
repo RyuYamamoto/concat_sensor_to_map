@@ -3,6 +3,7 @@
 #include <sensor_msgs/msg/point_cloud2.hpp>
 
 #include <pcl/filters/voxel_grid.h>
+#include <pcl/filters/crop_box.h>
 #include <pcl/io/io.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
@@ -27,6 +28,15 @@ public:
     map_frame_id_ = this->declare_parameter("map_frame_id", "map");
     save_path_ = this->declare_parameter("save_path", "");
     pcd_path_ = this->declare_parameter("pcd_path", "");
+
+    // cropbox parameter
+    crop_min_(0) = this->declare_parameter("min_crop_x", 0.0);
+    crop_min_(1) = this->declare_parameter("min_crop_y", 0.0);
+    crop_min_(2) = this->declare_parameter("min_crop_z", 0.0);
+    crop_max_(0) = this->declare_parameter("max_crop_x", 0.0);
+    crop_max_(1) = this->declare_parameter("max_crop_y", 0.0);
+    crop_max_(2) = this->declare_parameter("max_crop_z", 0.0);
+    crop_min_(3) = crop_max_(3) = 1.0f;
 
     points_subscriber_ = create_subscription<sensor_msgs::msg::PointCloud2>(
       "~/input/points_raw", rclcpp::SensorDataQoS().keep_last(1),
@@ -71,6 +81,14 @@ private:
     pcl::fromROSMsg(*msg, *input_points_ptr);
     sensor_msgs::msg::PointCloud2 transform_cloud;
 
+    pcl::PointCloud<pcl::PointXYZ>::Ptr crop_points_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::CropBox<pcl::PointXYZ> crop_box;
+    crop_box.setMin(crop_min_);
+    crop_box.setMax(crop_max_);
+    crop_box.setInputCloud(input_points_ptr);
+    crop_box.setNegative(false);
+    crop_box.filter(*crop_points_ptr);
+
     geometry_msgs::msg::TransformStamped frame_transform =
       getTransform(map_frame_id_, msg->header.frame_id);
     double diff_x =
@@ -82,7 +100,7 @@ private:
     if (distance < min_displacement_) return;
     prev_transform_ = frame_transform;
 
-    transformPointCloud(input_points_ptr, output_points_ptr, frame_transform);
+    transformPointCloud(crop_points_ptr, output_points_ptr, frame_transform);
 
     saveMap(output_points_ptr, leaf_size_);
   }
@@ -110,7 +128,7 @@ private:
 
     pcl::io::savePCDFileBinary(save_path_ + "/map_concat.pcd", *map_cloud_);
     pcl::io::savePCDFileBinary(
-      save_path_ + "/map_" + std::to_string(file_num_++) + ".pcd", *voxel_grid_cloud);
+      save_path_ + "/map_" + std::to_string(file_num_++) + ".pcd", *filtered_cloud);
   }
 
 private:
@@ -122,6 +140,10 @@ private:
   double leaf_size_;
   double min_displacement_;
   double min_distance_threshold_;
+
+  // cropbox parameter
+  Eigen::Vector4f crop_min_;
+  Eigen::Vector4f crop_max_;
 
   int file_num_{0};
 
